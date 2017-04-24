@@ -96,7 +96,7 @@
 
 //命令送信用Arudinoと接続するpinを設定
 //命令送信用Arudinoへ曲の再生情報を送信するときに使う
-#define STATE_PIN_MEDIA 9
+#define STATE_PIN_MEDIA 19
 
 //補足
 //PIN8は命令送信用ArduinoからStop命令を受け取る
@@ -171,8 +171,11 @@ void setup() {
   //TIMER2設定
   //高速PWM; コンペアマッチでLOW; TOP = OCR2A
 #ifdef _USE_PWM_MODE_
-  TCCR2A = _BV(COM2B1) | _BV(WGM21) | _BV(WGM20);  //8bit 高速PWM
-  OCR2B = 255; //PWM出力初期値255; 常に5Vを出して動作周波数のパルスを出さないようにする
+  //8bit高速PWM OCR2B出力; コンペアマッチでLow設定は再生手前
+  TCCR2A = _BV(WGM21) | _BV(WGM20);
+  //TCCR2A = _BV(COM2B1) | _BV(WGM21) | _BV(WGM20);
+  //PWM出力初期値0
+  OCR2B = 0;
 #endif
 
 #ifdef _USE_8BIT_MODE_
@@ -237,9 +240,25 @@ void loop() {
     //シリアルデータ削除
     SerialClear();
   }
+  
+  //コンペアマッチでLOW
+#ifdef _USE_PWM_MODE_
+  TCCR2A |= _BV(COM2B1);
+#endif
 
   //サウンド再生開始
   Play();
+
+  
+  //再生終了
+#ifdef _USE_PWM_MODE_
+  OCR2B = 0;
+  TCCR2A &= ~_BV(COM2B1);
+#endif
+
+#ifdef _USE_8BIT_MODE_
+  PORTD = B00000000;
+#endif
 
 }
 
@@ -252,24 +271,25 @@ void Play(void)
     Stop();
     return;
   }
-  
+
   //PCM構造体の初期化
   pcm0.bufIndex = 0;
   pcm0.bufPage = 0;
   pcm0.readNextPage = 1;
   overlapCnt = 0;
 
+
   //WAVファイル読み込み
   MonoWaveRead(&pcm0, waveFileName, &fp);
 
   //8MHzArudinoのとき
 #ifdef _DEFINE_8MHz_
-  overlap = (32000 / pcm0.fs);
+  overlap = 32000 / pcm0.fs;
 #endif
 
   //16MHzArudinoのとき
 #ifdef _DEFINE_16MHz_
-  overlap = (64000 / pcm0.fs);
+  overlap = 64000 / pcm0.fs;
 #endif
 
   //タイマー割り込み開始
@@ -284,14 +304,6 @@ void Play(void)
     MonoWaveSoundRead(&pcm0, &fp);
   }
 
-  //再生終了
-#ifdef _USE_PWM_MODE_
-  OCR2B = 255;
-#endif
-
-#ifdef _USE_8BIT_MODE_
-  PORTD = B00000000;
-#endif
   fp.close();
 }
 
