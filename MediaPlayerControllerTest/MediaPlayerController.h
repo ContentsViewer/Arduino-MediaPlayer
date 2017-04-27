@@ -114,7 +114,11 @@ private:
     byte mode;
 
 public:
-    
+    enum PLAY_MODE{
+      NORMAL = 0,
+      LOOP = 1,
+      WAIT = 2
+    };
     //
     //関数
     //  説明:
@@ -167,7 +171,7 @@ public:
     //      1: リピート再生
     //      2: サウンド停止待機
     //
-    void Load(char *waveFileName, byte mode)
+    void Load(char *waveFileName, PLAY_MODE mode)
     {
         this -> mode = mode;
 
@@ -176,7 +180,7 @@ public:
 
         //Load命令を送る
         Serial.write(1);  //ヘッダは 1
-        Serial.write(mode);  //再生モードを送信
+        Serial.write((unsigned char)mode);  //再生モードを送信
         Serial.print(waveFileName);  //ファイル名を送る
         Serial.write(NULL);  //終端文字を追加する
     }
@@ -196,7 +200,7 @@ public:
         Serial.write(2);  //コードは 2
 
         //再生状態になるまで待機
-        while(!digitalRead(statePin));
+        while(!IsPlaying());
         
         //状態送信待機
         //delay(100);
@@ -205,8 +209,12 @@ public:
         if (mode == 2)
         {
             //再生中のとき処理待機; STATE_PIN_MEDIAがLOWになったら処理再開
-            while (digitalRead(statePin));
+            while (IsPlaying());
         }
+    }
+
+    bool IsPlaying(){
+      return digitalRead(statePin);
     }
 };
 
